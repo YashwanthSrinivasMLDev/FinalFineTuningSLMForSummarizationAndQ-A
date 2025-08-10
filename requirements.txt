@@ -10,3 +10,4 @@ blobfile
 protobuf
 tiktoken
 openai
+streamlit
