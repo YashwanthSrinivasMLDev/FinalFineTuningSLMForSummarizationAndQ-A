@@ -1,0 +1,19 @@
+fineTuningSLM/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+artifiacts/
+# Python cache files
+__pycache__/
+*.pyc
+
+# IDE files
+.idea/
+.vscode/
+
+# Operating system files
+.DS_Store
+Thumbs.db

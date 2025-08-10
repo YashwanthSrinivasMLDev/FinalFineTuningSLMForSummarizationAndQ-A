@@ -1,0 +1,12 @@
+transformers
+pypdf
+peft
+accelerate
+datasets
+bitsandbytes
+torch
+torchvision
+blobfile
+protobuf
+tiktoken
+openai
