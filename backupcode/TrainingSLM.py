@@ -4,7 +4,6 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, DataCollatorForSeq
 from datasets import  Dataset
 from torch.utils.data import DataLoader
 import pypdf
-
 from accelerate import Accelerator
 
 
@@ -52,6 +51,12 @@ def create_model():
                                                  quantization_config=bnb_config,
                                                  device_map={"": 0})
     model.resize_token_embeddings(len(tokenizer))
+
+    # if tokenizer.pad_token is None:
+    #     # Add a new special token for padding
+    #     tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+    #     # Resize the model's token embeddings to include the new pad token
+
     return model
 
 def load_insurace_datasets():
@@ -79,16 +84,82 @@ def load_insurace_datasets():
 
     return train_dataloader
 
+# Tokenize both the article and the summary
+def tokenize_seq2seq(examples):
+    # Tokenize the input text
+    model_inputs = tokenizer(examples["article"], max_length=512, truncation=True)
+    # Tokenize the target text and set it as 'labels'
+    with tokenizer.as_target_tokenizer():
+        labels = tokenizer(examples["summary"], max_length=128, truncation=True)
+    model_inputs["labels"] = labels["input_ids"]
+    return model_inputs
 
-def preprocess_function_llama_fixed(examples):
-    # Input prompt
+def tokenize_pre_process_function_for_summarization(examples):
+    inputs = examples['article']
+    targets = examples['summary']
+
+    tokenized_input = tokenizer(
+        inputs,
+        max_length=1500,
+        truncation=True,
+        padding=True
+    )
+
+
+    tokenized_output = tokenizer.as_target_tokenizer(
+    # tokenized_output = tokenizer(
+        targets,
+        # max_length=254,
+        # truncation= True,
+
+    )
+
+    tokenized_input['labels']=tokenized_output['input_ids']
+    return tokenized_input
+
+def preprocess_function_2(examples):
+    inputs = examples["article"]
+    targets = examples["summary"]
+    model_inputs = tokenizer(
+        [f"Summarize: {inp}" for inp in inputs],
+        text_target=targets,  # this creates labels aligned with the target
+        max_length=1024,
+        truncation=True
+    )
+    return model_inputs
+
+def preprocess_function_3(examples):
+    model_inputs = tokenizer(
+        examples["article"],
+        max_length=512,
+        truncation=True,
+        padding="max_length"
+    )
+
+    with tokenizer.as_target_tokenizer():
+        labels = tokenizer(
+            examples["summary"],
+            max_length=128,
+            truncation=True,
+            padding="max_length"
+        )["input_ids"]
+
+    # Replace padding token id’s with -100 for labels
+    labels = [
+        [(label if label != tokenizer.pad_token_id else -100) for label in label_seq]
+        for label_seq in labels
+    ]
+
+    model_inputs["labels"] = labels
+    return model_inputs
+
+
+def preprocess_function_llama_4(examples):
+    # Tokenize inputs (articles with instruction)
     inputs = [
-        f"Summarize the following article:\n\n{article}\n\nSummary:"
+        f"Summarize the following:\n\n{article}\n\nSummary:"
         for article in examples["article"]
     ]
-    targets = examples["summary"]
-
-    # Tokenize separately
     model_inputs = tokenizer(
         inputs,
         max_length=512,
@@ -96,22 +167,23 @@ def preprocess_function_llama_fixed(examples):
         padding="max_length"
     )
 
-    # Tokenize labels (only the summary)
-    labels = tokenizer(
-        targets,
-        max_length=128,
-        truncation=True,
-        padding="max_length"
-    )["input_ids"]
+    # Tokenize targets (summaries) separately
+    with tokenizer.as_target_tokenizer():
+        labels = tokenizer(
+            examples["summary"],
+            max_length=128,
+            truncation=True,
+            padding="max_length"
+        )["input_ids"]
 
-    # Mask pad tokens
+    # Replace pad tokens in labels with -100
     labels = [
-        [(label if label != tokenizer.pad_token_id else -100) for label in seq]
-        for seq in labels
+        [(token if token != tokenizer.pad_token_id else -100) for token in label_seq]
+        for label_seq in labels
     ]
+
     model_inputs["labels"] = labels
     return model_inputs
-
 
 def preprocess_causal_sft(examples, max_source_len=512, max_target_len=128, max_seq_len=512):
     """
@@ -187,13 +259,76 @@ def load_training_data_for_multi_task_fine_tuning( unified_training_data, model 
                                     batched=True,
                                     remove_columns=["article", "summary"])
     data_collator = DefaultDataCollator(return_tensors="pt")
+    # data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer ,
+    #                                     model=model,  # pass model so it knows padding side
+    #                                        padding=True,
+    #                                        max_length=512
+    #                                        )
+    # data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False )
     train_dataloader = DataLoader(tokenized_dataset, shuffle=True,
                                   batch_size=BATCH_SIZE_FINE_TUNING,
                                   collate_fn=data_collator)
     return train_dataloader
 
 
-def train_model(model, train_dataloader, epochs=3, accumulation_steps=10, batch_size=4):
+def train_model(model, train_dataloader ,epochs = 3, accumulation_steps = 10, batch_size = 4 ):
+    #first need to check if model state dict is already present.
+    # model.to(device)
+    # 4. Set up the optimizer and learning rate scheduler
+    optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5)
+    num_epochs = epochs
+    num_training_steps = num_epochs * len(train_dataloader)
+    accumulation_steps = accumulation_steps
+    accelerator = Accelerator(
+        gradient_accumulation_steps=accumulation_steps,  # Integrate gradient accumulation
+        mixed_precision="fp16"  # Enable mixed precision
+    )
+    model, optimizer, train_dataloader = accelerator.prepare(model, optimizer, train_dataloader)
+    model.train()
+
+    if False :
+        return
+    else :
+        # Training loop
+        for epoch in range(num_epochs):
+            print("epoch ", epoch)
+            # The inner loop logic remains very similar
+            for batch_idx, batch in enumerate(train_dataloader):
+                # print("training on batch id : ", batch_idx, ", batch content : ", **batch )
+
+
+                # without accelerator
+            #     batch = {k: v.to(device) for k, v in batch.items()}
+            #     outputs= model(**batch)
+            #     loss= outputs.loss
+            #     loss = loss / accumulation_steps
+            #     loss.backward()
+            #     # Gradient accumulation logic
+            #     if (batch_idx + 1) % accumulation_steps == 0:
+            #         optimizer.step()
+            #         optimizer.zero_grad()
+            # optimizer.step()
+            # optimizer.zero_grad()
+
+
+
+                # with accelerator.accumulate(model):  # Context manager for gradient accumulation
+                outputs = model(**batch)
+                loss = outputs.loss
+                accelerator.backward(loss)
+
+                if accelerator.sync_gradients:  # Only step when gradients are ready
+                    optimizer.step()
+                    optimizer.zero_grad()
+        print("saved model weights")
+        return model
+
+
+from accelerate import Accelerator
+import torch
+
+
+def test_model_after_fine_tuning(model, train_dataloader, epochs=3, accumulation_steps=10, batch_size=4):
     accelerator = Accelerator(
         gradient_accumulation_steps=accumulation_steps,
         mixed_precision="fp16"
@@ -224,27 +359,53 @@ def train_model(model, train_dataloader, epochs=3, accumulation_steps=10, batch_
     print("Model saved.")
     return model
 
-from accelerate import Accelerator
-import torch
-
-
-def test_model_after_fine_tuning(model, article_text, max_new_tokens=150, min_new_tokens=100, task="summary"):
-    model.eval()
-    prompt = f"""### Instruction:
-    #         Summarize the following article:
-    #
-    #         {article_text}
-    #
-    #         ###Summary:
-    #         """
-    with torch.no_grad():
-        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-        outputs = model.generate(**inputs,
-                                 max_new_tokens=max_new_tokens,
-                                 min_new_tokens=min_new_tokens
-                                 )
-    return tokenizer.decode(outputs[0], skip_special_tokens=True)
-
-
-
+# def test_model_after_fine_tuning(model, text , task="summary"):
+#     final_prompt=""
+#     if task== "summary":
+#         final_prompt = f"""### Instruction:
+#         Summarize the following article:
+#
+#         {text}
+#
+#         ###Summary:
+#         """
+#         tokenized_final_prompt = tokenizer(
+#             final_prompt,
+#             return_tensors='pt',
+#             padding=True,
+#             truncation=True,
+#             # max_length=512
+#             max_length=1500,
+#         ).to(device)
+#
+#         outputs = model.generate(
+#             **tokenized_final_prompt,
+#             min_new_tokens=100,
+#             max_new_tokens=300,
+#             pad_token_id=tokenizer.eos_token_id,
+#             # early_stopping=True,
+#             # do_sample=True,
+#             max_length=1800,
+#             # top_k=50,
+#             # top_p = 0.95,
+#         )
+#
+#         decoded_output = tokenizer.decode(outputs[0], skip_special_tokens=True)
+#         print('decoded output ' , decoded_output)
+#         return decoded_output
+#
+#     elif task== "q&a":
+#         question = text
+#
+#         final_prompt = f"""### Instruction:
+#         Answer the following question:
+#
+#         {question}
+#
+#         ### Response:
+#         """
+#
+#
+#
+#     return
 
