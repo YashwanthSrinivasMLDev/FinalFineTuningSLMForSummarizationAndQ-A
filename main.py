@@ -8,10 +8,7 @@ import traceback
 from create_training_data_for_instruction_finetuning import create_training_data_summary_data_for_if
 from peft import PeftModel, get_peft_model, LoraConfig, TaskType
 
-from dotenv import load_dotenv
 
-load_dotenv()
-open_api_key = os.getenv("open_api_key")
 
 EPOCH_CONTINUED_TRAINING = 3
 # EPOCH_CONTINUED_TRAINING = 1
