@@ -5,7 +5,7 @@ fineTuningSLM/
 venv/
 env/
 
-artifiacts/
+artifacts/
 # Python cache files
 __pycache__/
 *.pyc
