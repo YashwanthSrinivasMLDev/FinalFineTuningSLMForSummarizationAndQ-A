@@ -11,3 +11,5 @@ protobuf
 tiktoken
 openai
 streamlit
+dotenv
+PyPDF2

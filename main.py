@@ -5,17 +5,30 @@ from TrainingSLM import load_insurace_datasets, create_model, train_model, \
     load_training_data_for_multi_task_fine_tuning
 import torch
 import traceback
-from create_training_data_for_instruction_finetuning import create_training_data_summary_data_for_if
+from create_training_data_for_instruction_finetuning import create_training_data_summary_data_for_if, \
+    create_training_data_qa_data_for_if
 from peft import PeftModel, get_peft_model, LoraConfig, TaskType
+from dotenv import load_dotenv
+load_dotenv()
+
+mode = os.getenv("mode")
+
+
+if mode == "testing":
+    EPOCH_CONTINUED_TRAINING = 1
+    EPOCH_FINE_TUNING = 1
+    ACCUMULATION_STEPS_FINETUNING = 1
+    ACCUMULATION_STEPS_CONTINUED_TRAINING = 1
+
+elif mode =="prod" :
+    EPOCH_CONTINUED_TRAINING = 3
+    EPOCH_FINE_TUNING = 3
+    ACCUMULATION_STEPS_CONTINUED_TRAINING = 16
+    ACCUMULATION_STEPS_FINETUNING = 8
 
 
 
-EPOCH_CONTINUED_TRAINING = 3
-# EPOCH_CONTINUED_TRAINING = 1
-# EPOCH_FINE_TUNING = 3
-EPOCH_FINE_TUNING = 3
-ACCUMULATION_STEPS_CONTINUED_TRAINING = 16
-ACCUMULATION_STEPS_FINETUNING = 8
+
 
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -63,8 +76,10 @@ def start_main_app() :
 
         #creating summary training data
         training_data_summaries = create_training_data_summary_data_for_if()
+        training_data_qa = create_training_data_qa_data_for_if()
+        consolidated_training_data_for_fine_tuning = training_data_summaries +  training_data_qa
         #creating dataloader for summary training data
-        train_dataloader_summary_training_data = load_training_data_for_multi_task_fine_tuning(training_data_summaries,model_trained_CT_on_insurance_datasets_tiny_llama)
+        train_dataloader_summary_training_data = load_training_data_for_multi_task_fine_tuning(consolidated_training_data_for_fine_tuning, model_trained_CT_on_insurance_datasets_tiny_llama)
         #fiinetuning  the model on summary training data
         print('finetuning on summary training data')
         if os.path.exists("artifacts/model_trained_FT_on_summary_tiny_llama"):
