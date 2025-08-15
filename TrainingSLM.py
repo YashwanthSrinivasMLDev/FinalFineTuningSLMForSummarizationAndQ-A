@@ -197,7 +197,7 @@ def load_training_data_for_multi_task_fine_tuning( unified_training_data, model 
 def train_model(model, train_dataloader, epochs=3, accumulation_steps=10, batch_size=4):
     accelerator = Accelerator(
         gradient_accumulation_steps=accumulation_steps,
-        mixed_precision="fp16" if device == "cuda" else "no"
+        # mixed_precision="fp16" if device == "cuda" else "no"
     )
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5)
@@ -225,8 +225,7 @@ def train_model(model, train_dataloader, epochs=3, accumulation_steps=10, batch_
     # print("Model saved.")
     return model
 
-from accelerate import Accelerator
-import torch
+
 
 
 def test_model_after_fine_tuning(model, article_text, max_new_tokens=150, min_new_tokens=100, task="summary"):
