@@ -220,8 +220,8 @@ def train_model(model, train_dataloader, epochs=3, accumulation_steps=10, batch_
                 optimizer.zero_grad()
 
     accelerator.wait_for_everyone()
-    accelerator.save_state("model_checkpoint")
-    print("Model saved.")
+    # accelerator.save_state("model_checkpoint")
+    # print("Model saved.")
     return model
 
 from accelerate import Accelerator
