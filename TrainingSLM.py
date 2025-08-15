@@ -7,13 +7,20 @@ import pypdf
 
 from accelerate import Accelerator
 
+from main import mode
+
+if mode == "testing":
+    BATCH_SIZE_CONTINUED_TRAINING = 1
+    BATCH_SIZE_FINE_TUNING = 1
+elif mode =="prod" :
+    BATCH_SIZE_CONTINUED_TRAINING = 4
+    BATCH_SIZE_FINE_TUNING = 4
+
 
 model_state_dict_weights_path = "artifacts/model/model_weights.pth"
 device = "cuda" if torch.cuda.is_available() else "cpu"
-BATCH_SIZE_CONTINUED_TRAINING = 4
-# BATCH_SIZE_CONTINUED_TRAINING = 1
-BATCH_SIZE_FINE_TUNING = 4
-# BATCH_SIZE_FINE_TUNING = 1
+
+
 # base_model_for_this_project = "sshleifer/distilbart-cnn-12-6"
 base_model_for_this_project = "TinyLlama/TinyLlama_v1.1"
 tokenizer = AutoTokenizer.from_pretrained(base_model_for_this_project)
@@ -114,16 +121,23 @@ def preprocess_function_llama_fixed(examples):
     return model_inputs
 
 
-def preprocess_causal_sft(examples, max_source_len=512, max_target_len=128, max_seq_len=512):
+def preprocess_causal_sft_summary(examples, max_source_len=512, max_target_len=128, max_seq_len=512):
     """
     Build input_ids as [prompt_ids + target_ids]
     Build labels as [-100 ... -100] for prompt tokens + [target_ids]
     Then pad/truncate both to max_seq_len.
     """
     prompts = [
-        f"Summarize the following:\n\n{art}\n\nSummary:"
+        f"""Task: Summarization
+            Input:{art}
+            """
         for art in examples["article"]
     ]
+    # prompts = [
+    #     f"Summarize the following:\n\n{art}\n\nSummary:"
+    #     for art in examples["article"]
+    # ]
+
     targets = [t for t in examples["summary"]]
 
     # tokenize without adding special tokens, we’ll manage EOS explicitly for the target
@@ -178,20 +192,123 @@ def preprocess_causal_sft(examples, max_source_len=512, max_target_len=128, max_
         "labels": labels_batch,
     }
 
+def preprocess_causal_sft_qa(examples, max_source_len=512, max_target_len=128, max_seq_len=512):
+    """
+    Build input_ids as [prompt_ids + target_ids]
+    Build labels as [-100 ... -100] for prompt tokens + [target_ids]
+    Then pad/truncate both to max_seq_len.
+    """
+    prompts = [
+        f"""Task: Q&A
+            Input: user : {question}
+            """
+        for question in examples["question"]
+    ]
 
-def load_training_data_for_multi_task_fine_tuning( unified_training_data, model ) :
-    #new method
-    data_dict = {'article': [sample['article'] for sample in unified_training_data],
-                 "summary": [sample['summary'] for sample in unified_training_data]}
-    dataset = Dataset.from_dict(data_dict)
-    tokenized_dataset = dataset.map(preprocess_causal_sft,
+
+    targets = [t for t in examples["answer"]]
+
+    # tokenize without adding special tokens, we’ll manage EOS explicitly for the target
+    prompt_enc = tokenizer(
+        prompts,
+        add_special_tokens=False,
+        truncation=True,
+        max_length=max_source_len
+    )
+    target_enc = tokenizer(
+        targets,
+        add_special_tokens=False,
+        truncation=True,
+        max_length=max_target_len
+    )
+
+    input_ids_batch = []
+    attention_masks_batch = []
+    labels_batch = []
+
+    eos_id = tokenizer.eos_token_id
+
+    for p_ids, t_ids in zip(prompt_enc["input_ids"], target_enc["input_ids"]):
+        # append EOS to target (very important for causal LM)
+        t_ids = t_ids + [eos_id]
+
+        # concatenate
+        input_ids = p_ids + t_ids
+        labels = ([-100] * len(p_ids)) + t_ids  # mask prompt, learn on target
+
+        # truncate to max_seq_len (truncate both in the same way)
+        input_ids = input_ids[:max_seq_len]
+        labels = labels[:max_seq_len]
+
+        # build attention mask before padding
+        attn = [1] * len(input_ids)
+
+        # pad to max_seq_len
+        pad_len = max_seq_len - len(input_ids)
+        if pad_len > 0:
+            input_ids = input_ids + [tokenizer.pad_token_id] * pad_len
+            attn = attn + [0] * pad_len
+            labels = labels + [-100] * pad_len  # never learn on pad
+
+        input_ids_batch.append(input_ids)
+        attention_masks_batch.append(attn)
+        labels_batch.append(labels)
+
+    return {
+        "input_ids": input_ids_batch,
+        "attention_mask": attention_masks_batch,
+        "labels": labels_batch,
+    }
+
+
+from torch.utils.data import TensorDataset
+
+def load_training_data_for_multi_task_fine_tuning( summary_data, qa_data ,  model ) :
+    #tokenizing summary_data
+    data_dict_summary = {'article': [sample['article'] for sample in summary_data],
+                 "summary": [sample['summary'] for sample in summary_data]}
+    dataset_summary = Dataset.from_dict(data_dict_summary)
+    tokenized_dataset_summary = dataset_summary.map(preprocess_causal_sft_summary,
                                     batched=True,
                                     remove_columns=["article", "summary"])
+
+    #tokenizing q&a_data
+    data_dict_qa = {'question': [sample['question'] for sample in summary_data],
+                 "answer": [sample['answer'] for sample in summary_data]}
+    dataset_qa = Dataset.from_dict(data_dict_qa)
+    tokenized_dataset_qa = dataset_qa.map(preprocess_causal_sft_qa,
+                                    batched=True,
+                                    remove_columns=["question", "answer"])
+    input_ids = torch.cat([tokenized_dataset_summary['input_ids'], tokenized_dataset_qa['input_ids']], dim=0)
+    attention_mask = torch.cat([tokenized_dataset_summary['attention_mask'], tokenized_dataset_qa['attention_mask']], dim=0)
+    labels = torch.cat([tokenized_dataset_summary['labels'], tokenized_dataset_qa['labels']], dim=0)
+    combined_dataset = TensorDataset(input_ids, attention_mask,labels)
     data_collator = DefaultDataCollator(return_tensors="pt")
-    train_dataloader = DataLoader(tokenized_dataset, shuffle=True,
+    train_dataloader= DataLoader(combined_dataset, shuffle=True,
                                   batch_size=BATCH_SIZE_FINE_TUNING,
-                                  collate_fn=data_collator)
+                                  collate_fn=data_collator )
+
+
+    # data_collator = DefaultDataCollator(return_tensors="pt")
+    # train_dataloader = DataLoader(tokenized_dataset, shuffle=True,
+    #                               batch_size=BATCH_SIZE_FINE_TUNING,
+    #                               collate_fn=data_collator)
     return train_dataloader
+
+# def load_training_data_for_multi_task_fine_tuning( unified_training_data, model ) :
+#     #new method
+#     data_dict = {'article': [sample['article'] for sample in unified_training_data],
+#                  "summary": [sample['summary'] for sample in unified_training_data]}
+#     dataset = Dataset.from_dict(data_dict)
+#     tokenized_dataset = dataset.map(preprocess_causal_sft,
+#                                     batched=True,
+#                                     remove_columns=["article", "summary"])
+#     data_collator = DefaultDataCollator(return_tensors="pt")
+#     train_dataloader = DataLoader(tokenized_dataset, shuffle=True,
+#                                   batch_size=BATCH_SIZE_FINE_TUNING,
+#                                   collate_fn=data_collator)
+#     return train_dataloader
+
 
 
 def train_model(model, train_dataloader, epochs=3, accumulation_steps=10, batch_size=4):
@@ -230,13 +347,16 @@ def train_model(model, train_dataloader, epochs=3, accumulation_steps=10, batch_
 
 def test_model_after_fine_tuning(model, article_text, max_new_tokens=150, min_new_tokens=100, task="summary"):
     model.eval()
-    prompt = f"""### Instruction:
-    #         Summarize the following article:
-    #
-    #         {article_text}
-    #
-    #         ###Summary:
-    #         """
+    prompt = f"""Task: Summarization
+        Input :  {article_text}
+        """
+    # prompt = f"""### Instruction:
+    # #         Summarize the following article:
+    # #
+    # #         {article_text}
+    # #
+    # #         ###Summary:
+    # #         """
     with torch.no_grad():
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
         outputs = model.generate(**inputs,
