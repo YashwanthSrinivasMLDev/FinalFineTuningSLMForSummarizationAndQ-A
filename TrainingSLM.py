@@ -37,7 +37,7 @@ def create_model():
 
     # using qlora peft for reduced memory usage
     # setting device
-    if device == "gpu" :
+    if device == "cuda" :
         bnb_config = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_use_double_quant=True,
