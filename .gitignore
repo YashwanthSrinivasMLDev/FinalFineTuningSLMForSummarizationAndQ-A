@@ -19,5 +19,5 @@ __pycache__/
 Thumbs.db
 
 ./.streamlit/secrets.toml
-./model_checkpoint
+model_checkpoint/
 
