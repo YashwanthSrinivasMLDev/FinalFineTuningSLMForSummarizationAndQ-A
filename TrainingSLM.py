@@ -184,77 +184,6 @@ def preprocess_causal_sft(examples, max_source_len=512, max_target_len=128, max_
         "labels": labels_batch,
     }
 
-# def preprocess_causal_sft_qa(examples, max_source_len=512, max_target_len=128, max_seq_len=512):
-#     """
-#     Build input_ids as [prompt_ids + target_ids]
-#     Build labels as [-100 ... -100] for prompt tokens + [target_ids]
-#     Then pad/truncate both to max_seq_len.
-#     """
-#     prompts = [
-#         f"""Task: Q&A
-#             Input: user : {question}
-#             """
-#         for question in examples["question"]
-#     ]
-#
-#
-#     targets = [t for t in examples["answer"]]
-#
-#     # tokenize without adding special tokens, we’ll manage EOS explicitly for the target
-#     prompt_enc = tokenizer(
-#         prompts,
-#         add_special_tokens=False,
-#         truncation=True,
-#         max_length=max_source_len
-#     )
-#     target_enc = tokenizer(
-#         targets,
-#         add_special_tokens=False,
-#         truncation=True,
-#         max_length=max_target_len
-#     )
-#
-#     input_ids_batch = []
-#     attention_masks_batch = []
-#     labels_batch = []
-#
-#     eos_id = tokenizer.eos_token_id
-#
-#     for p_ids, t_ids in zip(prompt_enc["input_ids"], target_enc["input_ids"]):
-#         # append EOS to target (very important for causal LM)
-#         t_ids = t_ids + [eos_id]
-#
-#         # concatenate
-#         input_ids = p_ids + t_ids
-#         labels = ([-100] * len(p_ids)) + t_ids  # mask prompt, learn on target
-#
-#         # truncate to max_seq_len (truncate both in the same way)
-#         input_ids = input_ids[:max_seq_len]
-#         labels = labels[:max_seq_len]
-#
-#         # build attention mask before padding
-#         attn = [1] * len(input_ids)
-#
-#         # pad to max_seq_len
-#         pad_len = max_seq_len - len(input_ids)
-#         if pad_len > 0:
-#             input_ids = input_ids + [tokenizer.pad_token_id] * pad_len
-#             attn = attn + [0] * pad_len
-#             labels = labels + [-100] * pad_len  # never learn on pad
-#
-#         input_ids_batch.append(input_ids)
-#         attention_masks_batch.append(attn)
-#         labels_batch.append(labels)
-#
-#     return {
-#         "input_ids": input_ids_batch,
-#         "attention_mask": attention_masks_batch,
-#         "labels": labels_batch,
-#     }
-
-
-from torch.utils.data import TensorDataset
-
 def load_training_data_for_multi_task_fine_tuning( unified_training_data, model ) :
     #new method
     data_dict = {'input': [sample['input'] for sample in unified_training_data],
@@ -268,59 +197,6 @@ def load_training_data_for_multi_task_fine_tuning( unified_training_data, model 
                                   batch_size=BATCH_SIZE_FINE_TUNING,
                                   collate_fn=data_collator)
     return train_dataloader
-
-# def load_training_data_for_multi_task_fine_tuning( summary_data, qa_data ,  model ) :
-#     #tokenizing summary_data
-#     data_dict_summary = {'article': [sample['article'] for sample in summary_data],
-#                  "summary": [sample['summary'] for sample in summary_data]}
-#     dataset_summary = Dataset.from_dict(data_dict_summary)
-#     tokenized_dataset_summary = dataset_summary.map(preprocess_causal_sft_summary,
-#                                     batched=True,
-#                                     remove_columns=["article", "summary"])
-#
-#     #tokenizing q&a_data
-#     data_dict_qa = {'question': [sample['question'] for sample in qa_data],
-#                  "answer": [sample['answer'] for sample in qa_data]}
-#     dataset_qa = Dataset.from_dict(data_dict_qa)
-#     tokenized_dataset_qa = dataset_qa.map(preprocess_causal_sft_qa,
-#                                     batched=True,
-#                                     remove_columns=["question", "answer"])
-#
-#
-#     input_ids_summary = torch.tensor(tokenized_dataset_summary['input_ids'])
-#     attention_mask_summary = torch.tensor(tokenized_dataset_summary['attention_mask'])
-#     labels_summary = torch.tensor(tokenized_dataset_summary['labels'])
-#
-#     input_ids_qa = torch.tensor(tokenized_dataset_qa['input_ids'])
-#     attention_mask_qa = torch.tensor(tokenized_dataset_qa['attention_mask'])
-#     labels_qa = torch.tensor(tokenized_dataset_qa['labels'])
-#
-#     input_ids = torch.cat([input_ids_summary,  input_ids_qa], dim=0)
-#     attention_mask = torch.cat([attention_mask_summary, attention_mask_qa], dim=0)
-#     labels = torch.cat([labels_summary,labels_qa], dim=0)
-#     combined_dataset = TensorDataset(input_ids, attention_mask,labels)
-#     data_collator = DefaultDataCollator(return_tensors="pt")
-#     train_dataloader= DataLoader(combined_dataset, shuffle=True,
-#                                   batch_size=BATCH_SIZE_FINE_TUNING,
-#                                   # collate_fn=data_collator
-#                                  )
-#
-#     return train_dataloader
-
-# def load_training_data_for_multi_task_fine_tuning( unified_training_data, model ) :
-#     #new method
-#     data_dict = {'article': [sample['article'] for sample in unified_training_data],
-#                  "summary": [sample['summary'] for sample in unified_training_data]}
-#     dataset = Dataset.from_dict(data_dict)
-#     tokenized_dataset = dataset.map(preprocess_causal_sft,
-#                                     batched=True,
-#                                     remove_columns=["article", "summary"])
-#     data_collator = DefaultDataCollator(return_tensors="pt")
-#     train_dataloader = DataLoader(tokenized_dataset, shuffle=True,
-#                                   batch_size=BATCH_SIZE_FINE_TUNING,
-#                                   collate_fn=data_collator)
-#     return train_dataloader
-
 
 
 def train_model(model, train_dataloader, epochs=3, accumulation_steps=10, batch_size=4):
@@ -337,25 +213,16 @@ def train_model(model, train_dataloader, epochs=3, accumulation_steps=10, batch_
     for epoch in range(epochs):
         print(f"Epoch {epoch + 1}/{epochs}")
         for batch_idx, batch in enumerate(train_dataloader):
-            # batch = {
-            #     "input_ids": batch[0].to(device),
-            #     "attention_mask": batch[1].to(device),
-            #     "labels": batch[2].to(device)
-            # }
             with accelerator.accumulate(model):
                 outputs = model(**batch)  # Ensure batch has input_ids, attention_mask, labels
 
                 loss = outputs.loss
-                # if not loss.requires_grad:
-                #     raise ValueError(f"Loss does not require grad at step {batch_idx}. Check your inputs!")
 
                 accelerator.backward(loss)
                 optimizer.step()
                 optimizer.zero_grad()
 
     accelerator.wait_for_everyone()
-    # accelerator.save_state("model_checkpoint")
-    # print("Model saved.")
     return model
 
 
@@ -363,16 +230,10 @@ def train_model(model, train_dataloader, epochs=3, accumulation_steps=10, batch_
 
 def test_model_after_fine_tuning(model, article_text, max_new_tokens=150, min_new_tokens=100, task="summary"):
     model.eval()
-    prompt = f"""Task: Summarization
-        Input :  {article_text}
-        """
-    # prompt = f"""### Instruction:
-    # #         Summarize the following article:
-    # #
-    # #         {article_text}
-    # #
-    # #         ###Summary:
-    # #         """
+    prompt = f"""Task: Summarization.
+        Input: {article_text}
+        Output: """
+
     with torch.no_grad():
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
         outputs = model.generate(**inputs,

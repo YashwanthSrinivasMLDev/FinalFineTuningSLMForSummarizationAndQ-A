@@ -1,7 +1,5 @@
 import torch
-from transformers import pipeline
 from PyPDF2 import PdfReader
-import textwrap
 import json
 
 consolidated_pdf_text_chunks = []
@@ -20,7 +18,7 @@ def create_training_data_summary_data_for_if ():
     for pair in article_summary_pairs:
         temp_qa_pair.append({'input': f"""Task: Summarization.
             Input:{pair['article']}
-            """ , 'target': pair['summary'], 'type': 'summary'})
+            """ , 'target': f"Output: {pair['summary']}", 'type': 'summary'})
 
     return temp_qa_pair
 
@@ -31,24 +29,11 @@ def create_training_data_qa_data_for_if ():
     temp_qa_pair = []
     for pair in qa_pairs:
         temp_qa_pair.append({'input': f"""Task: Q&A.
-        Input: User: {pair['question']}""" , 'target':pair['answer'], 'type':'qa'})
+        Input: User: {pair['question']}""" , 'target':f"Output: Agent: {pair['answer']}", 'type':'qa'})
 
     return temp_qa_pair
 
-# def create_training_data_qa_data_for_if() :
-#     # Step 3: Load Question Generation model
-#     qg_pipeline = pipeline("text2text-generation", model="iarfmoose/t5-base-question-generator")
-#
-#     # Step 4: Process PDF → Chunks → Q&A
-#     pdf_text = extract_text_from_pdf("example.pdf")
-#     chunks = chunk_text(pdf_text, chunk_size=400)
-#
-#     qa_pairs = []
-#     for chunk in chunks:
-#         result = qg_pipeline(chunk, max_length=512, num_return_sequences=1)
-#         qa_pairs.append(result[0]['generated_text'])
-#
-#     return qa_pairs
+
 
 # Step 1: Extract text from PDF using PyPDF
 def extract_text_from_pdf(pdf_path):

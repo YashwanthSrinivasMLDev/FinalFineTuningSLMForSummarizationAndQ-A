@@ -26,24 +26,10 @@ elif mode =="prod" :
     ACCUMULATION_STEPS_CONTINUED_TRAINING = 16
     ACCUMULATION_STEPS_FINETUNING = 8
 
-
-
-
-
-
 device = "cuda" if torch.cuda.is_available() else "cpu"
-# print('device ', device )
 def start_main_app() :
 
-    # with open("training_data/article-summaries/article_summary_pairs_array", "r") as f:
-    #     article_summary_pairs = json.load(f)
-    # print('len  ' , len(article_summary_pairs))
-    # for i  in range(len(article_summary_pairs)):
-    #     if i==0 :
-    #         print(article_summary_pairs[i]['article'])
-    #         print("############################################")
-    #         print(article_summary_pairs[i]['summary'])
-    # return
+
     try :
         torch.cuda.empty_cache()
         train_dataloader_continued_training = load_insurace_datasets()
@@ -71,7 +57,6 @@ def start_main_app() :
                                                                             accumulation_steps= ACCUMULATION_STEPS_CONTINUED_TRAINING)
             print('saving model continued training state dict to disk')
             model_trained_CT_on_insurance_datasets_tiny_llama.save_pretrained("./artifacts/model_continued_training")
-            # model_continued_training_state_dict = torch.save(model_trained_CT_on_insurance_datasets_tiny_llama.state_dict(), "./artifacts/model_continued_training")
 
 
         #creating summary training data
@@ -81,7 +66,7 @@ def start_main_app() :
         #creating dataloader for summary training data
         train_dataloader_summary_training_data = load_training_data_for_multi_task_fine_tuning(consolidated_training_data_for_fine_tuning, model_trained_CT_on_insurance_datasets_tiny_llama)
         #fiinetuning  the model on summary training data
-        print('finetuning on summary training data')
+        print('finetuning on summary + qa training data')
         if os.path.exists("artifacts/model_trained_FT_on_summary_tiny_llama"):
             print("model summary state dict exists. going to use that instead of retraining")
             model_trained_CT_on_insurance_datasets_tiny_llama.load_adapter("artifacts/model_trained_FT_on_summary_tiny_llama", adapter_name="summarization")
