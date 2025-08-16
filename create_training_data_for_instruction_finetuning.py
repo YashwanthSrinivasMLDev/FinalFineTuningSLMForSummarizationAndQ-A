@@ -15,10 +15,14 @@ def create_training_data_summary_data_for_if ():
     for pair in article_summary_pairs:
         pair['type']="summary"
     temp_qa_pair = []
+    # for pair in article_summary_pairs:
+    #     temp_qa_pair.append({'input': f"""Task: Summarization.
+    #         Input:{pair['article']}
+    #         """ , 'target': f"Output: {pair['summary']}", 'type': 'summary'})
     for pair in article_summary_pairs:
-        temp_qa_pair.append({'input': f"""Task: Summarization.
-            Input:{pair['article']}
-            """ , 'target': f"Output: {pair['summary']}", 'type': 'summary'})
+        temp_qa_pair.append({'input': f"""You are a helpful AI assistant who summarizes 
+        articles. Summarize the following article: {pair['article']}""" ,
+                    'target': f"Summary: {pair['summary']}", 'type': 'summary'})
 
     return temp_qa_pair
 
@@ -27,9 +31,14 @@ def create_training_data_qa_data_for_if ():
     with open("training_data/qa_data/training_data_qa_pairs", "r") as f:
         qa_pairs = json.load(f)
     temp_qa_pair = []
+    # for pair in qa_pairs:
+    #     temp_qa_pair.append({'input': f"""Task: Q&A.
+    #     Input: User: {pair['question']}""" , 'target':f"Output: Agent: {pair['answer']}", 'type':'qa'})
+
     for pair in qa_pairs:
-        temp_qa_pair.append({'input': f"""Task: Q&A.
-        Input: User: {pair['question']}""" , 'target':f"Output: Agent: {pair['answer']}", 'type':'qa'})
+        temp_qa_pair.append({'input': f"""You are a helpful AI assistant who
+         answers questions. Answer this question {pair['question']}""" ,
+                             'target':f"Answer: {pair['answer']}", 'type':'qa'})
 
     return temp_qa_pair
 

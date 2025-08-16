@@ -23,11 +23,14 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 # base_model_for_this_project = "sshleifer/distilbart-cnn-12-6"
-base_model_for_this_project = "TinyLlama/TinyLlama_v1.1"
+# base_model_for_this_project = "TinyLlama/TinyLlama_v1.1"
+base_model_for_this_project = "microsoft/phi-2"
 tokenizer = AutoTokenizer.from_pretrained(base_model_for_this_project)
-tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+# tokenizer.add_special_tokens({'pad_token': '[PAD]'})
+
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
+tokenizer.padding_side = "right"
 
 print("using device : ", device)
 
@@ -89,40 +92,7 @@ def load_insurace_datasets():
     return train_dataloader
 
 
-def preprocess_function_llama_fixed(examples):
-    # Input prompt
-    inputs = [
-        f"Summarize the following article:\n\n{article}\n\nSummary:"
-        for article in examples["article"]
-    ]
-    targets = examples["summary"]
-
-    # Tokenize separately
-    model_inputs = tokenizer(
-        inputs,
-        max_length=512,
-        truncation=True,
-        padding="max_length"
-    )
-
-    # Tokenize labels (only the summary)
-    labels = tokenizer(
-        targets,
-        max_length=128,
-        truncation=True,
-        padding="max_length"
-    )["input_ids"]
-
-    # Mask pad tokens
-    labels = [
-        [(label if label != tokenizer.pad_token_id else -100) for label in seq]
-        for seq in labels
-    ]
-    model_inputs["labels"] = labels
-    return model_inputs
-
-
-def preprocess_causal_sft(examples, max_source_len=512, max_target_len=128, max_seq_len=512):
+def preprocess_causal_sft(examples, max_source_len=384, max_target_len=128, max_seq_len=512):
     """
     Build input_ids as [prompt_ids + target_ids]
     Build labels as [-100 ... -100] for prompt tokens + [target_ids]
@@ -131,6 +101,7 @@ def preprocess_causal_sft(examples, max_source_len=512, max_target_len=128, max_
     prompts = [ i for i in examples["input"]]
 
     targets = [t for t in examples["target"]]
+
 
     # tokenize without adding special tokens, we’ll manage EOS explicitly for the target
     prompt_enc = tokenizer(
@@ -228,20 +199,82 @@ def train_model(model, train_dataloader, epochs=3, accumulation_steps=10, batch_
 
 
 
-def test_model_after_fine_tuning(model, article_text, max_new_tokens=150, min_new_tokens=100, task="summary"):
+# def test_model_after_fine_tuning(model, article_text, max_new_tokens=150, min_new_tokens=100, task="summary"):
+#     model.eval()
+#
+#     truncated_article = tokenizer.decode(
+#         tokenizer(article_text, truncation=True, max_length=370, add_special_tokens=False)["input_ids"]
+#     )
+#
+#     prompt = f"""Task: Summarization.
+#         Input: {truncated_article}
+#         Output: """
+#
+#     with torch.no_grad():
+#         inputs = tokenizer(prompt,
+#                            return_tensors="pt",
+#                            truncation=True,
+#                            # max_length=384
+#                            ).to(model.device)
+#         outputs = model.generate(**inputs,
+#                                  max_new_tokens=max_new_tokens,
+#                                  min_new_tokens=min_new_tokens,
+#                                  return_dict_in_generate=True
+#                                  )
+#         # generated_tokens = outputs[0][inputs["input_ids"].shape[1]:]
+#         # summary = tokenizer.decode(generated_tokens, skip_special_tokens=True)
+#         summary = tokenizer.decode(outputs.sequences[0], skip_special_tokens=True)
+#         generated_ids = outputs[0][inputs["input_ids"].shape[1]:]  # only new tokens
+#         print("Generated token IDs:", generated_ids.tolist())
+#         print("Generated tokens:", tokenizer.convert_ids_to_tokens(generated_ids))
+#     return summary
+
+
+
+def test_model_after_fine_tuning(model, article_text, max_new_tokens=100, min_new_tokens=70, task="summary"):
     model.eval()
-    prompt = f"""Task: Summarization.
-        Input: {article_text}
-        Output: """
+
+    truncated_article = tokenizer.decode(
+                tokenizer(article_text, truncation=True, max_length=370, add_special_tokens=False)["input_ids"]
+            )
+
+
+    # prompt = f"""Task: Summarization.
+    #          Input: {truncated_article}
+    #          Output: """
+
+    prompt = f"""You are a helpful AI assistant who summarizes 
+        articles. Summarize the following article: {truncated_article}"""
+
+    # prompt = f"""Summarize this article {truncated_article} """
+
+    # Figure out how many tokens are in the prompt
+    inputs = tokenizer(prompt, return_tensors="pt", add_special_tokens=False).to(model.device)
+    prompt_len = inputs["input_ids"].shape[1]
+    max_context = model.config.max_position_embeddings
+
+    # Leave space for new tokens
+    max_allowed_prompt_len = max_context - max_new_tokens
+    if prompt_len > max_allowed_prompt_len:
+        print(f"⚠️ Prompt too long ({prompt_len} tokens). Trimming to {max_allowed_prompt_len} tokens.")
+        inputs = tokenizer(prompt, return_tensors="pt", truncation=True, add_special_tokens=False,  max_length=max_allowed_prompt_len).to(
+            model.device)
 
     with torch.no_grad():
-        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-        outputs = model.generate(**inputs,
-                                 max_new_tokens=max_new_tokens,
-                                 min_new_tokens=min_new_tokens
-                                 )
-    return tokenizer.decode(outputs[0], skip_special_tokens=True)
+        outputs = model.generate(
+            **inputs,
+            max_new_tokens=max_new_tokens,
+            min_new_tokens=min_new_tokens,
+            # eos_token_id=tokenizer.eos_token_id,
+            eos_token_id=None,
+            pad_token_id=tokenizer.pad_token_id,
+            # do_sample=True,
+            # temperature=0.1
 
+        )
 
+    # Decode only the newly generated part
+    generated_ids = outputs[0][inputs["input_ids"].shape[1]:]
+    return tokenizer.decode(generated_ids, skip_special_tokens=True)
 
 
