@@ -26,7 +26,6 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 # base_model_for_this_project = "TinyLlama/TinyLlama_v1.1"
 base_model_for_this_project = "microsoft/phi-2"
 tokenizer = AutoTokenizer.from_pretrained(base_model_for_this_project)
-# tokenizer.add_special_tokens({'pad_token': '[PAD]'})
 
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
@@ -64,7 +63,7 @@ def create_model():
         model = AutoModelForCausalLM.from_pretrained(base_model_for_this_project,
                                                      device_map={"": "cpu"})
     model.resize_token_embeddings(len(tokenizer))
-    return model
+    return model, tokenizer
 
 def load_insurace_datasets():
     # extracted policy information from pdfs found in this link : https://www.cms.gov/marketplace/resources/fact-sheets-faqs
@@ -184,6 +183,7 @@ def train_model(model, train_dataloader, epochs=3, accumulation_steps=10, batch_
     for epoch in range(epochs):
         print(f"Epoch {epoch + 1}/{epochs}")
         for batch_idx, batch in enumerate(train_dataloader):
+            print('training batch idx : ',batch_idx)
             with accelerator.accumulate(model):
                 outputs = model(**batch)  # Ensure batch has input_ids, attention_mask, labels
 
@@ -231,7 +231,7 @@ def train_model(model, train_dataloader, epochs=3, accumulation_steps=10, batch_
 
 
 
-def test_model_after_fine_tuning(model, article_text, max_new_tokens=100, min_new_tokens=70, task="summary"):
+def run_fine_tuned_model(model, article_text, max_new_tokens=50, min_new_tokens=30, task="summary"):
     model.eval()
 
     truncated_article = tokenizer.decode(
@@ -239,9 +239,6 @@ def test_model_after_fine_tuning(model, article_text, max_new_tokens=100, min_ne
             )
 
 
-    # prompt = f"""Task: Summarization.
-    #          Input: {truncated_article}
-    #          Output: """
 
     prompt = f"""You are a helpful AI assistant who summarizes 
         articles. Summarize the following article: {truncated_article}"""
@@ -265,11 +262,11 @@ def test_model_after_fine_tuning(model, article_text, max_new_tokens=100, min_ne
             **inputs,
             max_new_tokens=max_new_tokens,
             min_new_tokens=min_new_tokens,
-            # eos_token_id=tokenizer.eos_token_id,
-            eos_token_id=None,
+            eos_token_id=tokenizer.eos_token_id,
+            # eos_token_id=None,
             pad_token_id=tokenizer.pad_token_id,
-            # do_sample=True,
-            # temperature=0.1
+            do_sample=True,
+            temperature=0.1
 
         )
 

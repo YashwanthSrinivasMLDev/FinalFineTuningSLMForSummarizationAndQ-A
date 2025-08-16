@@ -34,7 +34,7 @@ def start_main_app() :
         torch.cuda.empty_cache()
         train_dataloader_continued_training = load_insurace_datasets()
         print("dataloader : ", train_dataloader_continued_training)
-        model_tiny_llama = create_model()
+        model_tiny_llama, tokenizer = create_model()
 
         if os.path.exists("./artifacts/model_continued_training"):
             print("model state dict for continued training already exists. loading it instead of retraining")
@@ -71,7 +71,7 @@ def start_main_app() :
             print("model summary state dict exists. going to use that instead of retraining")
             model_trained_CT_on_insurance_datasets_tiny_llama.load_adapter("artifacts/model_trained_FT_on_summary_tiny_llama", adapter_name="summarization")
             model_trained_CT_on_insurance_datasets_tiny_llama.set_adapter("summarization")
-            return model_trained_CT_on_insurance_datasets_tiny_llama
+            return model_trained_CT_on_insurance_datasets_tiny_llama, tokenizer
         else :
             print("model summary state dict doesn't exist. going to train the model from scratch")
             model_trained_FT_on_summary_tiny_llama = train_model(model_trained_CT_on_insurance_datasets_tiny_llama,
@@ -81,7 +81,7 @@ def start_main_app() :
 
             print("saving model summary state dict to disk")
             model_trained_FT_on_summary_tiny_llama.save_pretrained("artifacts/model_trained_FT_on_summary_tiny_llama")
-            return model_trained_FT_on_summary_tiny_llama
+            return model_trained_FT_on_summary_tiny_llama, tokenizer
 
     except Exception :
         print("exception : ",traceback.print_exc() )
