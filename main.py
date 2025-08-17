@@ -63,6 +63,7 @@ def start_main_app() :
         training_data_summaries = create_training_data_summary_data_for_if()
         training_data_qa = create_training_data_qa_data_for_if()
         consolidated_training_data_for_fine_tuning = training_data_summaries +  training_data_qa
+        # consolidated_training_data_for_fine_tuning = training_data_summaries
         #creating dataloader for summary training data
         train_dataloader_summary_training_data = load_training_data_for_multi_task_fine_tuning(consolidated_training_data_for_fine_tuning, model_trained_CT_on_insurance_datasets_tiny_llama)
         #fiinetuning  the model on summary training data

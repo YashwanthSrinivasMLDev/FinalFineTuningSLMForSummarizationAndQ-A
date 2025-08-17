@@ -23,12 +23,12 @@ fine_tuned_model, tokenizer= load_model()
 if not fine_tuned_model:
     print("error in creating model : re-rerun the app")
 else :
-    question = st.text_input("Type your question here")
+    article = st.text_input("Type your article here")
 
-    if question :
+    if article :
         print("generting output ")
         info_text.text("generating output")
-        output = run_fine_tuned_model(fine_tuned_model, question)
+        output = run_fine_tuned_model(fine_tuned_model, article)
         info_text.text("generation done")
         # print(response['answer'])
         st.header("Output  : ")

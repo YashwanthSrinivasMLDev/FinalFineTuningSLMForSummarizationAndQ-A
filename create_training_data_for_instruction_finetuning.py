@@ -15,10 +15,7 @@ def create_training_data_summary_data_for_if ():
     for pair in article_summary_pairs:
         pair['type']="summary"
     temp_qa_pair = []
-    # for pair in article_summary_pairs:
-    #     temp_qa_pair.append({'input': f"""Task: Summarization.
-    #         Input:{pair['article']}
-    #         """ , 'target': f"Output: {pair['summary']}", 'type': 'summary'})
+
     for pair in article_summary_pairs:
         temp_qa_pair.append({'input': f"""You are a helpful AI assistant who summarizes 
         articles. Summarize the following article: {pair['article']}""" ,
