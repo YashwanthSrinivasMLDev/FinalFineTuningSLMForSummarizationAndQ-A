@@ -204,7 +204,6 @@ def run_fine_tuned_model(model, article_text, max_new_tokens=50, min_new_tokens=
     prompt = f"""You are a helpful AI assistant who summarizes 
         articles. Summarize the following article: {truncated_article}"""
 
-    # prompt = f"""Summarize this article {truncated_article} """
 
     # Figure out how many tokens are in the prompt
     inputs = tokenizer(prompt, return_tensors="pt", add_special_tokens=False).to(model.device)

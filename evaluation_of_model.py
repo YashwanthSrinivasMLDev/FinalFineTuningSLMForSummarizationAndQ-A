@@ -15,19 +15,13 @@ def set_up_all_models():
 
 def evaluate_all_models_summary(model_use_case, model_finetuned,tokenizer_finedtuned=None, ):
     print("inside evaluate all models, model use case " , model_use_case)
-    # models =[
-    #     {'model_name': "microsoft/phi-2",
-    #      'already_finetuned' : 'yes',
-    #      }
-    # ]
+
     # our fine-tuned model
     results_finetuned = evaluate_model(model_use_case, model_finetuned,tokenizer_finedtuned,  model_name="finetuned_model(microsoft/phi-2)")
-    # print('results_finetuned ' , results_finetuned)
-    # for hugging face models
 
+    # for hugging face models
     #foundational slm
     results_fm_TinyLlama= evaluate_model(model_use_case, model=None,tokenizer=None , model_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0")
-    # print('results_fm_TinyLlama ' , results_fm_TinyLlama)
 
     #gpt 3.5
     # results.append(evaluate_model(model=None,tokenizer=None,model_name="Xenova/gpt-3.5-turbo-16k"))
@@ -68,7 +62,6 @@ def  evaluate_model( model_use_case,  model=None, tokenizer=None,  model_name=No
         nltk.download('punkt_tab')
         smoothing_function = SmoothingFunction().method1
         for i, sample in enumerate(test_set_summarization):
-            # print(i,sample)
             articles.append(sample['article'])
             ground_truth_summaries.append(sample['summary'])
             prompt = f""" You are a helpful AI assistant.
@@ -129,12 +122,9 @@ def  evaluate_model( model_use_case,  model=None, tokenizer=None,  model_name=No
 
     elif model_use_case == "qa":
         for i, sample in enumerate(test_set_qa):
-            # print(i,sample)
             questions.append(sample['question'])
             ground_truth_answers.append(sample['answer'])
 
-        #    prompt = f""" You are a helpful AI assistant who
-        # answers questions. Answer this question {sample['question']} """
 
             prompt = f""" You are a helpful AI assistant. 
                 Provide a concise and accurate answer to the following question. 
@@ -170,15 +160,7 @@ def  evaluate_model( model_use_case,  model=None, tokenizer=None,  model_name=No
             answer = tokenizer.decode(generated_ids, skip_special_tokens=True)
             generated_answers.append(answer)
 
-            # print("article : ", articles )
-            # print("ground truth summaries :", ground_truth_summaries )
-            # print('generated summaries', generated_summaries)
-            # result =  rouge.compute(
-            #     predictions=[answer] ,
-            #     references= [sample['answer']],
-            #     # rouge_types=['rouge1','rouge2','rougeL']
-            #     rouge_types=['rougeL']
-            # )
+             
             p,r,f1 = score (
                 [answer],
                 [sample['answer']],
