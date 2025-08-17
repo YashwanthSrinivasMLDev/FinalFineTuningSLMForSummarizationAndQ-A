@@ -15,12 +15,14 @@ mode = os.getenv("mode")
 
 
 if mode == "testing":
+    print("in testing mode")
     EPOCH_CONTINUED_TRAINING = 1
     EPOCH_FINE_TUNING = 1
     ACCUMULATION_STEPS_FINETUNING = 1
     ACCUMULATION_STEPS_CONTINUED_TRAINING = 1
 
 elif mode =="prod" :
+    print("in production mode")
     EPOCH_CONTINUED_TRAINING = 3
     EPOCH_FINE_TUNING = 3
     ACCUMULATION_STEPS_CONTINUED_TRAINING = 16
