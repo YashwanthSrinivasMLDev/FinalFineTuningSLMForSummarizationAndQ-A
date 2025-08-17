@@ -5,6 +5,7 @@ from main import start_main_app
 from TrainingSLM import run_fine_tuned_model
 from  evaluation_of_model import evaluate_all_models_summary
 import pandas as pd
+print("dummy change")
 st.title('FineTuning SLM')
 #app info
 # st.markdown("###### FineTuning SLM")
