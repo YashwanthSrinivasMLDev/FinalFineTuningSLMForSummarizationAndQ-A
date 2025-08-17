@@ -1,3 +1,5 @@
+import os
+os.environ["STREAMLIT_WATCHER_TYPE"] = "poll"
 import streamlit as st
 from main import start_main_app
 from TrainingSLM import run_fine_tuned_model
