@@ -23,8 +23,8 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 # base_model_for_this_project = "sshleifer/distilbart-cnn-12-6"
-# base_model_for_this_project = "TinyLlama/TinyLlama_v1.1"
-base_model_for_this_project = "microsoft/phi-2"
+base_model_for_this_project = "TinyLlama/TinyLlama_v1.1"
+# base_model_for_this_project = "microsoft/phi-2"
 tokenizer = AutoTokenizer.from_pretrained(base_model_for_this_project)
 
 if tokenizer.pad_token is None:
