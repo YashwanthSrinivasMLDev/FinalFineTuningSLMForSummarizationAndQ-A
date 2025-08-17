@@ -17,3 +17,4 @@ evaluate
 nltk
 rouge_score
 pandas
+bert-score

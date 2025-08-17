@@ -5,7 +5,9 @@ import torch
 from testing_data.summarization_testing_datat import  test_set_summarization
 from testing_data.qa_testing_data import test_set_qa
 rouge = evaluate.load('rouge')
-
+from bert_score import score
+import nltk
+from nltk.translate.bleu_score import sentence_bleu , SmoothingFunction
 
 def set_up_all_models():
 
@@ -31,6 +33,7 @@ def evaluate_all_models_summary(model_use_case, model_finetuned,tokenizer_finedt
     # results.append(evaluate_model(model=None,tokenizer=None,model_name="Xenova/gpt-3.5-turbo-16k"))
     # print(len(results_finetuned), len(results_fm_TinyLlama))
     # print(type(results_finetuned), type(results_fm_TinyLlama))
+
     combined_results = [ {**dict1, **dict2} for dict1, dict2 in  zip(results_finetuned, results_fm_TinyLlama)]
 
     # print("evaluation of all models done : ", combined_results )
@@ -40,8 +43,8 @@ def evaluate_all_models_summary(model_use_case, model_finetuned,tokenizer_finedt
 def  evaluate_model( model_use_case,  model=None, tokenizer=None,  model_name=None ):
     print("evaluating for model : ", model_name, " for use case : ", model_use_case)
     device= "cuda" if torch.cuda.is_available() else "cpu"
-    max_new_tokens = 30
-    min_new_tokens = 5
+    max_new_tokens = 50
+    min_new_tokens = 30
     results = []
     rogue_scores =[]
     articles=[]
@@ -61,6 +64,9 @@ def  evaluate_model( model_use_case,  model=None, tokenizer=None,  model_name=No
     model.to(device)
 
     if model_use_case=="summarization":
+        nltk.download('punkt')
+        nltk.download('punkt_tab')
+        smoothing_function = SmoothingFunction().method1
         for i, sample in enumerate(test_set_summarization):
             # print(i,sample)
             articles.append(sample['article'])
@@ -107,11 +113,14 @@ def  evaluate_model( model_use_case,  model=None, tokenizer=None,  model_name=No
                 rouge_types=['rougeL']
             )
 
+            bleu_score_for_this_sample = sentence_bleu( nltk.word_tokenize(summary.lower()), nltk.word_tokenize(sample['summary'].lower()), smoothing_function=smoothing_function)
+
             results.append({
                 'article': sample['article'],
                 'summary': sample['summary'],
-                f" {model_name}_rougeL": result['rougeL'],
-                f" {model_name}_predicted_answer": summary,
+                f"{model_name}_predicted_answer": summary,
+                f"{model_name}_rougeL": result['rougeL'],
+                f"{model_name}_bleu_score": bleu_score_for_this_sample,
             })
 
         del model
@@ -120,8 +129,6 @@ def  evaluate_model( model_use_case,  model=None, tokenizer=None,  model_name=No
 
     elif model_use_case == "qa":
         for i, sample in enumerate(test_set_qa):
-            # if i > 1:
-            #     break
             # print(i,sample)
             questions.append(sample['question'])
             ground_truth_answers.append(sample['answer'])
@@ -166,18 +173,26 @@ def  evaluate_model( model_use_case,  model=None, tokenizer=None,  model_name=No
             # print("article : ", articles )
             # print("ground truth summaries :", ground_truth_summaries )
             # print('generated summaries', generated_summaries)
-            result =  rouge.compute(
-                predictions=[answer] ,
-                references= [sample['answer']],
-                # rouge_types=['rouge1','rouge2','rougeL']
-                rouge_types=['rougeL']
+            # result =  rouge.compute(
+            #     predictions=[answer] ,
+            #     references= [sample['answer']],
+            #     # rouge_types=['rouge1','rouge2','rougeL']
+            #     rouge_types=['rougeL']
+            # )
+            p,r,f1 = score (
+                [answer],
+                [sample['answer']],
+                lang='en',
             )
+
 
             results.append({
                 'question' : sample['question'],
                 'answer' : sample['answer'],
-                f" {model_name}_rougeL" : result['rougeL'] ,
                 f" {model_name}_predicted_answer" :  answer ,
+                f" {model_name}_bert_score_p" : p.item() ,
+                f" {model_name}_bert_score_r" : r.item() ,
+                f" {model_name}_bert_score_f1" : f1.item() ,
             })
         del model
         torch.cuda.empty_cache()

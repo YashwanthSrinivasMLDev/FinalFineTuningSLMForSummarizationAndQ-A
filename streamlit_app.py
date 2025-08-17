@@ -33,7 +33,7 @@ else :
     # st.text("Choose an use-case for evaluating the test-cases   ")
 
     if article :
-        print("generting output ")
+        print("generating output ")
         # info_text.text("generating output")
         info_text.markdown(
             '<p style="color: orange; font-size:18px;">app status : generating output</p>',
@@ -80,16 +80,8 @@ if st.button("Evaluate on summarization test-cases"):
         '<p style="color: green; font-size:18px;">app status : evaluating models for summarization</p>',
         unsafe_allow_html=True
     )
-if st.button("Evaluate on conversational test-cases"):
-    st.markdown(f"Selected use-case : Conversational")
-    st.session_state.model_use_case="conversational"
-    dataframe = evaluate("conversational")
-    # st.table(dataframe)
-    st.dataframe(dataframe, height=200, use_container_width=False)
-    info_text.markdown(
-        '<p style="color: green; font-size:18px;">app status : evaluating models for conversational</p>',
-        unsafe_allow_html=True
-    )
+
+
 if st.button("Evaluate on Q&A test-cases"):
     st.markdown(f"Selected use-case : qa")
     st.session_state.model_use_case="qa"
