@@ -16,5 +16,4 @@ PyPDF2
 evaluate
 nltk
 rouge_score
-absl
 pandas
