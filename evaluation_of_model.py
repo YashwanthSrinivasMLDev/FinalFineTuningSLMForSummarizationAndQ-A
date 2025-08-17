@@ -6,9 +6,7 @@ from testing_data.summarization_testing_datat import  test_set_summarization
 from testing_data.qa_testing_data import test_set_qa
 rouge = evaluate.load('rouge')
 
-# models_to_test = [
-#     {'model': }
-# ]
+
 def set_up_all_models():
 
     return True
@@ -122,8 +120,8 @@ def  evaluate_model( model_use_case,  model=None, tokenizer=None,  model_name=No
 
     elif model_use_case == "qa":
         for i, sample in enumerate(test_set_qa):
-            if i > 1:
-                break
+            # if i > 1:
+            #     break
             # print(i,sample)
             questions.append(sample['question'])
             ground_truth_answers.append(sample['answer'])

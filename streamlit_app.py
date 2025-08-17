@@ -25,7 +25,12 @@ fine_tuned_model, tokenizer= load_model()
 if not fine_tuned_model:
     print("error in creating model : re-rerun the app")
 else :
-    article = st.text_input("Type your article here")
+    article = st.text_input("Paste your article here for summarization")
+    st.markdown("or")
+    question = st.text_input("Ask your question here")
+    st.markdown("or")
+    st.markdown("Evaluate models on already existing test-data -- models being compared : microsoft/phi-2 (fine-tuned on insurance data) vs TinyLlama")
+    # st.text("Choose an use-case for evaluating the test-cases   ")
 
     if article :
         print("generting output ")
@@ -59,13 +64,13 @@ def evaluate(use_case):
     print("clicked ")
 
 
-st.text("Choose an use-case for evaluating test-cases")
+
 model_use_case = ""
 
 if "model_use_case" in st.session_state:
     st.session_state.model_use_case = ""
 
-if st.button("Evaluate Summarization test-cases"):
+if st.button("Evaluate on summarization test-cases"):
     st.markdown(f"Selected use-case : Summarization")
     st.session_state.model_use_case="summarization"
     dataframe = evaluate("summarization")
@@ -75,7 +80,7 @@ if st.button("Evaluate Summarization test-cases"):
         '<p style="color: green; font-size:18px;">app status : evaluating models for summarization</p>',
         unsafe_allow_html=True
     )
-if st.button("Evaluate Conversational test-cases"):
+if st.button("Evaluate on conversational test-cases"):
     st.markdown(f"Selected use-case : Conversational")
     st.session_state.model_use_case="conversational"
     dataframe = evaluate("conversational")
@@ -85,7 +90,7 @@ if st.button("Evaluate Conversational test-cases"):
         '<p style="color: green; font-size:18px;">app status : evaluating models for conversational</p>',
         unsafe_allow_html=True
     )
-if st.button("Evaluate qa test-cases"):
+if st.button("Evaluate on Q&A test-cases"):
     st.markdown(f"Selected use-case : qa")
     st.session_state.model_use_case="qa"
     dataframe = evaluate("qa")

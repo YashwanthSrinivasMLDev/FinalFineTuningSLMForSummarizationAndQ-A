@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 import pypdf
 from accelerate import Accelerator
 from dotenv import load_dotenv
+from create_training_data_for_instruction_finetuning import normalize_spaces
 load_dotenv()
 
 mode = os.getenv("mode")
@@ -71,7 +72,7 @@ def load_insurace_datasets():
             reader = pypdf.PdfReader(filepath)
             for page in reader.pages:
                 pdf_text += page.extract_text()
-            consolidated_pdf_text.append({"text": pdf_text})
+            consolidated_pdf_text.append({"text": normalize_spaces(pdf_text)})
 
     data_dict = {'text': [doc['text'] for doc in consolidated_pdf_text]}
     dataset_name = "us_health_insurance_policy_corpus"

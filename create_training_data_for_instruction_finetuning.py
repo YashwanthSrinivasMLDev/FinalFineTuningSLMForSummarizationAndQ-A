@@ -1,6 +1,8 @@
 import torch
 from PyPDF2 import PdfReader
 import json
+import unicodedata
+
 
 consolidated_pdf_text_chunks = []
 consolidated_training_data_for_summarization  = []
@@ -75,5 +77,9 @@ def chunk_text(text, chunk_size=400):
 
 
 
-
-
+def normalize_spaces(text: str) -> str:
+    # Replace all space-like unicode chars with normal space
+    return "".join(
+        " " if unicodedata.category(ch) == "Zs" else ch
+        for ch in text
+    ).replace("\xa0", " ").strip()
