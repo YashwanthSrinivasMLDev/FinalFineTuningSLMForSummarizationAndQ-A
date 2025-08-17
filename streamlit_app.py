@@ -5,12 +5,11 @@ from main import start_main_app
 from TrainingSLM import run_fine_tuned_model
 from  evaluation_of_model import evaluate_all_models_summary
 import pandas as pd
-print("dummy change")
 st.title('FineTuning SLM')
 #app info
 # st.markdown("###### FineTuning SLM")
 # st.markdown("###### Your Text")
-
+st.set_page_config(layout="wide")
 info_text = st.empty()
 
 @st.cache_resource
@@ -30,23 +29,78 @@ else :
 
     if article :
         print("generting output ")
-        info_text.text("generating output")
+        # info_text.text("generating output")
+        info_text.markdown(
+            '<p style="color: orange; font-size:18px;">app status : generating output</p>',
+            unsafe_allow_html=True
+        )
         output = run_fine_tuned_model(fine_tuned_model, article)
-        info_text.text("generation done")
+        # info_text.text("generation done")
+        info_text.markdown(
+            '<p style="color: green; font-size:18px;">app status : generation done</p>',
+            unsafe_allow_html=True
+        )
         # print(response['answer'])
         st.header("Output  : ")
         st.write(output)
 
 
-def evaluate():
-    info_text.text("evaluating models")
-    results = evaluate_all_models_summary(fine_tuned_model, tokenizer)
+def evaluate(use_case):
+    print("inside evaluate , model use case " , use_case)
+    # info_text.text("app status : evaluating models")
+    info_text.markdown(
+        '<p style="color: orange; font-size:18px;">app status : evaluating models</p>',
+        unsafe_allow_html=True
+    )
+    results = evaluate_all_models_summary(use_case, fine_tuned_model, tokenizer )
     pandas_dataframe = pd.DataFrame(results)
     return pandas_dataframe
     # st.table(pandas_dataframe)
     print("clicked ")
 
-if st.button("Evaluate test data"):
-    dataframe = evaluate()
-    st.table(dataframe)
-    info_text.text("evaluation done")
+
+st.text("Choose an use-case for evaluating test-cases")
+model_use_case = ""
+
+if "model_use_case" in st.session_state:
+    st.session_state.model_use_case = ""
+
+if st.button("Evaluate Summarization test-cases"):
+    st.markdown(f"Selected use-case : Summarization")
+    st.session_state.model_use_case="summarization"
+    dataframe = evaluate("summarization")
+    # st.table(dataframe)
+    st.dataframe(dataframe, height=200, use_container_width=False)
+    info_text.markdown(
+        '<p style="color: green; font-size:18px;">app status : evaluating models for summarization</p>',
+        unsafe_allow_html=True
+    )
+if st.button("Evaluate Conversational test-cases"):
+    st.markdown(f"Selected use-case : Conversational")
+    st.session_state.model_use_case="conversational"
+    dataframe = evaluate("conversational")
+    # st.table(dataframe)
+    st.dataframe(dataframe, height=200, use_container_width=False)
+    info_text.markdown(
+        '<p style="color: green; font-size:18px;">app status : evaluating models for conversational</p>',
+        unsafe_allow_html=True
+    )
+if st.button("Evaluate qa test-cases"):
+    st.markdown(f"Selected use-case : qa")
+    st.session_state.model_use_case="qa"
+    dataframe = evaluate("qa")
+    # st.table(dataframe)
+    st.dataframe(dataframe, height=200, use_container_width=False)
+    info_text.markdown(
+        '<p style="color: green; font-size:18px;">app status : evaluating models for qa</p>',
+        unsafe_allow_html=True
+    )
+
+# if st.button("Evaluate test data"):
+#     dataframe = evaluate(st.session_state.model_use_case)
+#     st.table(dataframe)
+#     info_text.markdown(
+#         '<p style="color: green; font-size:18px;">app status : evaluating models</p>',
+#         unsafe_allow_html=True
+#     )
+#     # info_text.text("evaluation done")

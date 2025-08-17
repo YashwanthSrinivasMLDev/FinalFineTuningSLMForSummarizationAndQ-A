@@ -23,8 +23,8 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 # base_model_for_this_project = "sshleifer/distilbart-cnn-12-6"
-base_model_for_this_project = "TinyLlama/TinyLlama_v1.1"
-# base_model_for_this_project = "microsoft/phi-2"
+# base_model_for_this_project = "TinyLlama/TinyLlama_v1.1"
+base_model_for_this_project = "microsoft/phi-2"
 tokenizer = AutoTokenizer.from_pretrained(base_model_for_this_project)
 
 if tokenizer.pad_token is None:
@@ -37,11 +37,6 @@ def tokenize_function(examples):
     # This function tokenizes the text data for the model
     return tokenizer(examples["text"], truncation=True, max_length=512)
 
-def tokenize_instruction_finetuning(examples):
-    # This function formats the data as an instruction for summarization fine-tuning
-    prompt_template = "### Instruction:\nSummarize the following article:\n\n{article}\n\n### Summary:\n{summary}"
-    texts = [prompt_template.format(article=art, summary=summ) for art, summ in zip(examples["article"], examples["summary"])]
-    return tokenizer(texts, truncation=True, max_length=512)
 
 def create_model():
 
@@ -198,47 +193,12 @@ def train_model(model, train_dataloader, epochs=3, accumulation_steps=10, batch_
 
 
 
-
-# def test_model_after_fine_tuning(model, article_text, max_new_tokens=150, min_new_tokens=100, task="summary"):
-#     model.eval()
-#
-#     truncated_article = tokenizer.decode(
-#         tokenizer(article_text, truncation=True, max_length=370, add_special_tokens=False)["input_ids"]
-#     )
-#
-#     prompt = f"""Task: Summarization.
-#         Input: {truncated_article}
-#         Output: """
-#
-#     with torch.no_grad():
-#         inputs = tokenizer(prompt,
-#                            return_tensors="pt",
-#                            truncation=True,
-#                            # max_length=384
-#                            ).to(model.device)
-#         outputs = model.generate(**inputs,
-#                                  max_new_tokens=max_new_tokens,
-#                                  min_new_tokens=min_new_tokens,
-#                                  return_dict_in_generate=True
-#                                  )
-#         # generated_tokens = outputs[0][inputs["input_ids"].shape[1]:]
-#         # summary = tokenizer.decode(generated_tokens, skip_special_tokens=True)
-#         summary = tokenizer.decode(outputs.sequences[0], skip_special_tokens=True)
-#         generated_ids = outputs[0][inputs["input_ids"].shape[1]:]  # only new tokens
-#         print("Generated token IDs:", generated_ids.tolist())
-#         print("Generated tokens:", tokenizer.convert_ids_to_tokens(generated_ids))
-#     return summary
-
-
-
 def run_fine_tuned_model(model, article_text, max_new_tokens=50, min_new_tokens=30, task="summary"):
     model.eval()
 
     truncated_article = tokenizer.decode(
                 tokenizer(article_text, truncation=True, max_length=370, add_special_tokens=False)["input_ids"]
             )
-
-
 
     prompt = f"""You are a helpful AI assistant who summarizes 
         articles. Summarize the following article: {truncated_article}"""
@@ -273,5 +233,3 @@ def run_fine_tuned_model(model, article_text, max_new_tokens=50, min_new_tokens=
     # Decode only the newly generated part
     generated_ids = outputs[0][inputs["input_ids"].shape[1]:]
     return tokenizer.decode(generated_ids, skip_special_tokens=True)
-
-
